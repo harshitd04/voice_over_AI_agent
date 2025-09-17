@@ -189,23 +189,24 @@ def make_call():
         
         # Real Exotel API call
         exotel_url = f"https://api.exotel.com/v1/Accounts/{EXOTEL_SID}/Calls/connect.json"
-        
-        # Audio file URL (you'll need to make this publicly accessible for Exotel)
-        audio_url = f"https://yourdomain.com/static/audio/{audio_file}"  # Replace with your actual domain
-        
+
+        # Audio file URL (MUST be publicly accessible for Exotel to fetch and play it)
+        # Example: Use ngrok or deploy to a public server, then update the domain below
+        audio_url = f"https://yourdomain.com/static/audio/{audio_file}"  # <-- Replace with your actual public domain or ngrok URL
+
         payload = {
             'From': '09513886363',  # Replace with your Exotel virtual number
             'To': phone_number,
             'Url': audio_url,  # URL to your audio file
             'CallType': 'trans'
         }
-        
+
         response = requests.post(
             exotel_url,
             data=payload,
             auth=(EXOTEL_API_KEY, EXOTEL_API_TOKEN)
         )
-        
+
         if response.status_code == 200:
             call_data = response.json()
             return jsonify({
@@ -215,7 +216,9 @@ def make_call():
                 'status': call_data.get('Call', {}).get('Status', '')
             })
         else:
-            return jsonify({'success': False, 'error': 'Failed to initiate call'})
+            # Print and return the actual Exotel error for debugging
+            print(f"Exotel API error: {response.status_code} {response.text}")
+            return jsonify({'success': False, 'error': f'Failed to initiate call: {response.status_code} {response.text}'})
     
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
