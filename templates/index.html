@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice over AI Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 600px;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .status {
+            margin-top: 1rem;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .audio-player {
+            margin-top: 1rem;
+            display: none;
+        }
+        
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .step-indicator {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #667eea;
+        }
+        
+        .step-indicator h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+        
+        .step-indicator p {
+            color: #666;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1> Voice over AI Agent</h1>
+        
+        <div class="step-indicator">
+            <h3>How to use:</h3>
+            <p>1. Enter your text → 2. Select a voice → 3. Generate speech → 4. Enter phone number → 5. Make call</p>
+        </div>
+        
+        <form id="voiceForm">
+            <div class="form-group">
+                <label for="textInput">Enter Text to Convert to Speech:</label>
+                <textarea id="textInput" name="text" placeholder="Hello! This is a test call from our AI voice agent. Thank you for listening!" required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="voiceSelect">Select Voice:</label>
+                <select id="voiceSelect" name="voice_id" required>
+                    <option value="">Loading voices...</option>
+                </select>
+            </div>
+            
+            <button type="button" id="generateBtn"> Generate Speech</button>
+            
+            <div class="audio-player" id="audioPlayer">
+                <label>Generated Audio:</label>
+                <audio controls id="audioElement">
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+            
+            <div class="form-group" id="phoneGroup" style="display: none;">
+                <label for="phoneInput">Phone Number (with country code):</label>
+                <input type="tel" id="phoneInput" name="phone_number" placeholder="+1234567890" required>
+            </div>
+            
+            <button type="button" id="callBtn" style="display: none;"> Make Call</button>
+            
+            <div class="status" id="statusDiv"></div>
+        </form>
+    </div>
+
+    <script>
+        let generatedAudioFile = '';
+        
+        // Load voices when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadVoices();
+        });
+        
+        function loadVoices() {
+            fetch('/get_voices')
+                .then(response => response.json())
+                .then(data => {
+                    const voiceSelect = document.getElementById('voiceSelect');
+                    voiceSelect.innerHTML = '';
+                    
+                    if (data.success && data.voices) {
+                        data.voices.forEach(voice => {
+                            const option = document.createElement('option');
+                            option.value = voice.voice_id;
+                            option.textContent = `${voice.name} (${voice.category})`;
+                            voiceSelect.appendChild(option);
+                        });
+                    } else {
+                        voiceSelect.innerHTML = '<option value="">Error loading voices</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading voices:', error);
+                    document.getElementById('voiceSelect').innerHTML = '<option value="">Error loading voices</option>';
+                });
+        }
+        
+        // Generate speech
+        document.getElementById('generateBtn').addEventListener('click', function() {
+            const text = document.getElementById('textInput').value;
+            const voiceId = document.getElementById('voiceSelect').value;
+            
+            if (!text || !voiceId) {
+                showStatus('Please enter text and select a voice', 'error');
+                return;
+            }
+            
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="loading"></span>Generating...';
+            
+            fetch('/generate_speech', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    voice_id: voiceId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = ' Generate Speech';
+                
+                if (data.success) {
+                    generatedAudioFile = data.audio_file;
+                    
+                    // Show audio player
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    const audioElement = document.getElementById('audioElement');
+                    audioElement.src = data.audio_url;
+                    audioPlayer.style.display = 'block';
+                    
+                    // Show phone input and call button
+                    document.getElementById('phoneGroup').style.display = 'block';
+                    document.getElementById('callBtn').style.display = 'inline-block';
+                    
+                    showStatus('Speech generated successfully! You can now enter a phone number and make a call.', 'success');
+                } else {
+                    showStatus('Error generating speech: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = ' Generate Speech';
+                console.error('Error:', error);
+                showStatus('Error generating speech: ' + error.message, 'error');
+            });
+        });
+        
+        // Make call
+        document.getElementById('callBtn').addEventListener('click', function() {
+            const phoneNumber = document.getElementById('phoneInput').value;
+            
+            if (!phoneNumber) {
+                showStatus('Please enter a phone number', 'error');
+                return;
+            }
+            
+            if (!generatedAudioFile) {
+                showStatus('Please generate speech first', 'error');
+                return;
+            }
+            
+            const callBtn = document.getElementById('callBtn');
+            callBtn.disabled = true;
+            callBtn.innerHTML = '<span class="loading"></span>Calling...';
+            
+            fetch('/make_call', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    phone_number: phoneNumber,
+                    audio_file: generatedAudioFile
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                callBtn.disabled = false;
+                callBtn.innerHTML = ' Make Call';
+                
+                if (data.success) {
+                    showStatus(`Call initiated successfully! Call ID: ${data.call_id} | Status: ${data.status}`, 'success');
+                } else {
+                    showStatus('Error making call: ' + data.error, 'error');
+                }
+            })
+            .catch(error => {
+                callBtn.disabled = false;
+                callBtn.innerHTML = ' Make Call';
+                console.error('Error:', error);
+                showStatus('Error making call: ' + error.message, 'error');
+            });
+        });
+        
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusDiv');
+            statusDiv.textContent = message;
+            statusDiv.className = 'status ' + type;
+            statusDiv.style.display = 'block';
+            
+            // Hide status after 5 seconds for success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+    </script>
+</body>
+</html>S
